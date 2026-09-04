@@ -8,8 +8,9 @@ const Product3D = () => {
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const bottleRef = useRef<THREE.Mesh | null>(null);
+  const bottleGroupRef = useRef<THREE.Group | null>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
+  const animationIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -38,6 +39,7 @@ const Product3D = () => {
 
     // Create bottle geometry
     const bottleGroup = new THREE.Group();
+    bottleGroupRef.current = bottleGroup;
 
     // Main cylinder (bottle body)
     const bodyGeometry = new THREE.CylinderGeometry(0.6, 0.7, 2.5, 32);
@@ -128,7 +130,6 @@ const Product3D = () => {
     bottleGroup.add(label);
 
     scene.add(bottleGroup);
-    bottleRef.current = bottleGroup as unknown as THREE.Mesh;
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -151,23 +152,24 @@ const Product3D = () => {
     window.addEventListener('mousemove', handleMouseMove);
 
     // Animation loop
-    let animationId: number;
     const animate = () => {
-      animationId = requestAnimationFrame(animate);
+      animationIdRef.current = requestAnimationFrame(animate);
 
       if (bottleGroup) {
         // Auto rotation
         bottleGroup.rotation.y += 0.003;
         
-        // Mouse influence
-        bottleGroup.rotation.y += mouseRef.current.x * 0.3;
-        bottleGroup.rotation.x += mouseRef.current.y * 0.2;
+        // Mouse influence (only on desktop)
+        if (window.innerWidth >= 768) {
+          bottleGroup.rotation.y += mouseRef.current.x * 0.3;
+          bottleGroup.rotation.x += mouseRef.current.y * 0.2;
+        }
 
         // Floating animation
         bottleGroup.position.y = Math.sin(Date.now() * 0.0005) * 0.2;
       }
 
-      if (camera && renderer) {
+      if (camera && renderer && scene) {
         renderer.render(scene, camera);
       }
     };
@@ -192,13 +194,22 @@ const Product3D = () => {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationId);
-      containerRef.current?.removeChild(renderer.domElement);
-      geometry.dispose();
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
+      if (containerRef.current && renderer && renderer.domElement.parentElement === containerRef.current) {
+        containerRef.current.removeChild(renderer.domElement);
+      }
+      bodyGeometry.dispose();
+      neckGeometry.dispose();
+      capGeometry.dispose();
+      bandGeometry.dispose();
+      labelGeometry.dispose();
       bodyMaterial.dispose();
       capMaterial.dispose();
       bandMaterial.dispose();
       labelMaterial.dispose();
+      labelTexture.dispose();
       renderer.dispose();
     };
   }, []);
